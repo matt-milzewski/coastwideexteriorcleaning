@@ -192,9 +192,18 @@ h3 { font-size: var(--fs-xl); font-weight: 600; }
 }
 
 .nav__logo img {
-  height: 48px;
+  height: 64px;
   width: auto;
   object-fit: contain;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 2px;
+}
+
+@media (max-width: 767px) {
+  .nav__logo img {
+    height: 52px;
+  }
 }
 
 .nav__links {

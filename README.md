@@ -50,28 +50,20 @@ coastwide-website/
 
 The site deploys automatically on push to `main` via GitHub Actions.
 
-### Required GitHub Secrets
+### Infrastructure (Automatic)
+
+The S3 bucket and CloudFront distribution are created automatically via CloudFormation on the first deploy. No need to create them manually — push to `main` and it handles everything.
+
+The CloudFormation template lives at `infrastructure/cloudformation.yml`.
+
+### Required GitHub Secrets (just 2)
 
 | Secret | Description |
 |--------|-------------|
-| `AWS_ACCESS_KEY_ID` | AWS IAM access key |
+| `AWS_ACCESS_KEY_ID` | AWS IAM access key (needs S3, CloudFront, CloudFormation permissions) |
 | `AWS_SECRET_ACCESS_KEY` | AWS IAM secret key |
-| `AWS_REGION` | AWS region (e.g., `ap-southeast-2`) |
-| `S3_BUCKET_NAME` | S3 bucket name for hosting |
-| `CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution ID |
 
-### Manual Deploy
-
-```bash
-# Sync static assets (long cache)
-aws s3 sync src/ s3://YOUR_BUCKET --delete --cache-control "max-age=31536000,public" --exclude "*.html"
-
-# Sync HTML (short cache)
-aws s3 sync src/ s3://YOUR_BUCKET --delete --cache-control "max-age=300,public" --include "*.html"
-
-# Invalidate CDN
-aws cloudfront create-invalidation --distribution-id YOUR_DIST_ID --paths "/*"
-```
+The region (`ap-southeast-2`) and stack name (`coastwide-website`) are configured in the workflow file.
 
 ## Domain
 

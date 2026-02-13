@@ -1,0 +1,33 @@
+:root {
+  --deep-blue: #0A3D6B;
+  --aqua: #1ABDD5;
+  --orange: #F47B20;
+  --white: #FFFFFF;
+  --pale-aqua: #F0F8FF;
+  --dark-grey: #333333;
+  --light-border: #B0C4DE;
+
+  --font-heading: 'Montserrat', system-ui, -apple-system, Arial, sans-serif;
+  --font-body: 'Open Sans', system-ui, -apple-system, Arial, sans-serif;
+
+  --fs-base: 16px;
+  --fs-sm: 0.875rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 2rem;
+  --fs-3xl: 2.5rem;
+  --fs-4xl: 3rem;
+
+  --spacing-xs: 0.5rem;
+  --spacing-sm: 1rem;
+  --spacing-md: 1.5rem;
+  --spacing-lg: 2rem;
+  --spacing-xl: 3rem;
+  --spacing-2xl: 4rem;
+  --spacing-3xl: 6rem;
+
+  --max-width: 1200px;
+  --nav-height: 72px;
+  --border-radius: 8px;
+  --transition: 0.3s ease;
+}

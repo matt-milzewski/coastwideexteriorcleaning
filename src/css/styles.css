@@ -476,7 +476,13 @@ main {
 
 @media (min-width: 768px) {
   .why-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1200px) {
+  .why-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
@@ -637,6 +643,26 @@ main {
   .team-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+
+  .team-grid--owners {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 900px;
+    margin: 0 auto;
+  }
+}
+
+.team-card__role {
+  color: var(--aqua);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.team-card__bio {
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  text-align: left;
+  color: var(--dark-grey);
 }
 
 .team-card__photo {

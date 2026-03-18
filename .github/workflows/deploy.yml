@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: coastwide-production-deploy
+  cancel-in-progress: false
+
 env:
   STACK_NAME: coastwide-website
   AWS_REGION: ap-southeast-2
@@ -29,6 +33,28 @@ jobs:
         env:
           ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
         run: |
+          if aws cloudformation describe-stacks --stack-name "$STACK_NAME" >/dev/null 2>&1; then
+            while true; do
+              STACK_STATUS=$(aws cloudformation describe-stacks \
+                --stack-name "$STACK_NAME" \
+                --query "Stacks[0].StackStatus" \
+                --output text)
+              echo "Current stack status: $STACK_STATUS"
+
+              case "$STACK_STATUS" in
+                *_IN_PROGRESS)
+                  echo "Stack is busy. Waiting 20 seconds before retrying..."
+                  sleep 20
+                  ;;
+                *)
+                  break
+                  ;;
+              esac
+            done
+          else
+            echo "Stack does not exist yet. Continuing with initial deploy."
+          fi
+
           PARAM_OVERRIDES="DomainName=$DOMAIN_NAME WwwDomainName=$WWW_DOMAIN_NAME"
           if [ -n "$ACM_CERTIFICATE_ARN" ]; then
             PARAM_OVERRIDES="$PARAM_OVERRIDES AcmCertificateArn=$ACM_CERTIFICATE_ARN"

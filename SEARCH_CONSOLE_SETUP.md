@@ -39,7 +39,7 @@ Submit this sitemap in Search Console:
 
 ## 4. URLs To Inspect And Request Indexing
 
-Inspect these URLs after the site is deployed on the canonical domain:
+Inspect these URLs after the site is deployed on the canonical domain:  
 
 1. `https://coastwideexteriors.com.au/`
 2. `https://coastwideexteriors.com.au/about.html`

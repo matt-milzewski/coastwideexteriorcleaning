@@ -4,8 +4,19 @@ Description: Coastwide Exterior Cleaning — S3 static hosting + CloudFront CDN
 Parameters:
   DomainName:
     Type: String
-    Default: www.coastwideext.com.au
-    Description: Production domain name (used for bucket naming and CloudFront alias)
+    Default: coastwideexteriors.com.au
+    Description: Canonical production domain name
+  WwwDomainName:
+    Type: String
+    Default: www.coastwideexteriors.com.au
+    Description: Secondary domain that should redirect to the canonical domain
+  AcmCertificateArn:
+    Type: String
+    Default: ''
+    Description: Optional ACM certificate ARN in us-east-1 for custom domain aliases
+
+Conditions:
+  UseCustomDomain: !Not [!Equals [!Ref AcmCertificateArn, '']]
 
 Resources:
   WebsiteBucket:
@@ -47,12 +58,79 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
+  CanonicalRedirectFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub '${AWS::StackName}-canonical-redirect'
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Redirect /index.html and www host requests to the canonical apex URL
+        Runtime: cloudfront-js-2.0
+      FunctionCode: !Sub |
+        function serializeQuery(querystring) {
+          var keys = Object.keys(querystring || {});
+          if (keys.length === 0) {
+            return '';
+          }
+
+          var parts = [];
+          for (var i = 0; i < keys.length; i++) {
+            var key = keys[i];
+            var entry = querystring[key];
+
+            if (entry.multiValue && entry.multiValue.length > 0) {
+              for (var j = 0; j < entry.multiValue.length; j++) {
+                parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(entry.multiValue[j].value));
+              }
+            } else if (entry.value && entry.value.length > 0) {
+              parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(entry.value));
+            } else {
+              parts.push(encodeURIComponent(key));
+            }
+          }
+
+          return parts.length > 0 ? '?' + parts.join('&') : '';
+        }
+
+        function redirect(location) {
+          return {
+            statusCode: 301,
+            statusDescription: 'Moved Permanently',
+            headers: {
+              location: { value: location },
+              'cache-control': { value: 'public, max-age=31536000' }
+            }
+          };
+        }
+
+        function handler(event) {
+          var request = event.request;
+          var host = request.headers.host ? request.headers.host.value : '';
+          var uri = request.uri || '/';
+          var queryString = serializeQuery(request.querystring);
+          var targetPath = uri === '/index.html' ? '/' : uri;
+
+          if (host === '${WwwDomainName}') {
+            return redirect('https://${DomainName}' + targetPath + queryString);
+          }
+
+          if (uri === '/index.html') {
+            return redirect('https://' + host + '/' + queryString);
+          }
+
+          return request;
+        }
+
   Distribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Enabled: true
         Comment: !Sub 'Coastwide Exterior Cleaning — ${DomainName}'
+        Aliases: !If
+          - UseCustomDomain
+          - [!Ref DomainName, !Ref WwwDomainName]
+          - !Ref AWS::NoValue
         DefaultRootObject: index.html
         HttpVersion: http2and3
         PriceClass: PriceClass_All
@@ -69,6 +147,15 @@ Resources:
           CachedMethods: [GET, HEAD]
           Compress: true
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt CanonicalRedirectFunction.FunctionMetadata.FunctionARN
+        ViewerCertificate: !If
+          - UseCustomDomain
+          - AcmCertificateArn: !Ref AcmCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - !Ref AWS::NoValue
         CustomErrorResponses:
           - ErrorCode: 404
             ResponseCode: 404

@@ -53,10 +53,21 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Active nav link highlighting
-  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  const normalizePath = (path) => {
+    if (!path || path === '/') return '/';
+    if (path.endsWith('/index.html')) return '/';
+    return path.replace(/\/+$/, '') || '/';
+  };
+
+  const currentPath = normalizePath(window.location.pathname);
   document.querySelectorAll('.nav__links a, .nav__drawer a').forEach(link => {
     const href = link.getAttribute('href');
-    if (href === currentPage || (currentPage === '' && href === 'index.html')) {
+    if (!href || href.startsWith('tel:') || href.startsWith('mailto:') || href.startsWith('#')) {
+      return;
+    }
+
+    const linkUrl = new URL(href, window.location.origin);
+    if (normalizePath(linkUrl.pathname) === currentPath) {
       link.classList.add('active');
     }
   });

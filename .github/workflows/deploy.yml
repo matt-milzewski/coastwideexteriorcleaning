@@ -8,6 +8,8 @@ on:
 env:
   STACK_NAME: coastwide-website
   AWS_REGION: ap-southeast-2
+  DOMAIN_NAME: coastwideexteriors.com.au
+  WWW_DOMAIN_NAME: www.coastwideexteriors.com.au
 
 jobs:
   deploy:
@@ -24,10 +26,18 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy infrastructure (creates or updates S3 + CloudFront)
+        env:
+          ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
         run: |
+          PARAM_OVERRIDES="DomainName=$DOMAIN_NAME WwwDomainName=$WWW_DOMAIN_NAME"
+          if [ -n "$ACM_CERTIFICATE_ARN" ]; then
+            PARAM_OVERRIDES="$PARAM_OVERRIDES AcmCertificateArn=$ACM_CERTIFICATE_ARN"
+          fi
+
           aws cloudformation deploy \
             --template-file infrastructure/cloudformation.yml \
             --stack-name "$STACK_NAME" \
+            --parameter-overrides $PARAM_OVERRIDES \
             --no-fail-on-empty-changeset
 
       - name: Get stack outputs (bucket name + distribution ID)

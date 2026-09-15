@@ -92,7 +92,13 @@
               Thank you! We'll reach out as soon as we can to organise a quote.
             </div>
 
-            <form class="quote-form" action="https://formspree.io/f/xzdaoelr" method="POST" novalidate>
+            <form class="quote-form" id="quote-form" action="https://formspree.io/f/xzdaoelr" method="POST" data-anchor-api-base="__ANCHOR_FORMS_API_BASE__" data-anchor-site-id="coastwide-exterior-cleaning" novalidate>
+              <input type="hidden" name="_startedAt" id="form-started-at">
+              <input type="hidden" name="_idempotencyKey" id="form-idempotency-key">
+              <div class="form-honeypot" aria-hidden="true">
+                <label for="_gotcha">Leave this field empty</label>
+                <input type="text" id="_gotcha" name="_gotcha" tabindex="-1" autocomplete="off">
+              </div>
               <div class="form-group">
                 <label for="name">Full Name *</label>
                 <input type="text" id="name" name="name" required autocomplete="name">
@@ -142,7 +148,19 @@
                 <textarea id="message" name="message" rows="5"></textarea>
               </div>
 
-              <button type="submit" class="btn btn--primary" style="width: 100%;">Send Quote Request</button>
+              <div class="form-group form-group--checkbox">
+                <input type="checkbox" id="consent" name="consent" value="true" required>
+                <div>
+                  <label for="consent">I consent to Coastwide Exterior Cleaning contacting me about my quote request. *</label>
+                  <div class="form-error" aria-live="polite"></div>
+                </div>
+              </div>
+
+              <button type="submit" id="quote-submit" class="btn btn--primary" style="width: 100%;">Send Quote Request</button>
+              <div class="form-submit-error" role="alert" aria-live="assertive">
+                <p>We could not confirm delivery. Please try again, call 0486 222 093, email coastwideext@gmail.com, or use the backup service below.</p>
+                <button type="button" id="backup-submit" class="btn btn--secondary">Send using our backup service</button>
+              </div>
             </form>
           </div>
 
@@ -253,6 +271,6 @@
   </div>
 
   <script src="js/main.js"></script>
-  <script src="js/form.js"></script>
+  <script src="js/form.js?v=2"></script>
 </body>
 </html>

@@ -4,25 +4,47 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.querySelector('.quote-form');
   if (!form) return;
 
-  // Pre-select service from URL parameter
+  const submitBtn = document.getElementById('quote-submit');
+  const backupBtn = document.getElementById('backup-submit');
+  const successMsg = document.querySelector('.form-success');
+  const submitError = document.querySelector('.form-submit-error');
+  const startedAtInput = document.getElementById('form-started-at');
+  const idempotencyInput = document.getElementById('form-idempotency-key');
+  const anchorApiBase = (form.dataset.anchorApiBase || '').trim().replace(/\/+$/, '');
+  const anchorSiteId = form.dataset.anchorSiteId || 'coastwide-exterior-cleaning';
+  const useAnchorForms = Boolean(anchorApiBase);
+
+  const newIdempotencyKey = () => {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+  };
+
+  const resetSubmissionMetadata = () => {
+    if (startedAtInput) startedAtInput.value = String(Date.now());
+    if (idempotencyInput) idempotencyInput.value = newIdempotencyKey();
+  };
+
+  resetSubmissionMetadata();
+
   const params = new URLSearchParams(window.location.search);
   const serviceParam = params.get('service');
   if (serviceParam) {
     const serviceSelect = form.querySelector('select[name="service"]');
     if (serviceSelect) {
-      const options = serviceSelect.querySelectorAll('option');
-      options.forEach(opt => {
-        if (opt.value === serviceParam || opt.textContent.trim() === serviceParam) {
-          opt.selected = true;
+      [...serviceSelect.options].forEach((option) => {
+        if (option.value === serviceParam || option.textContent.trim() === serviceParam) {
+          option.selected = true;
         }
       });
     }
   }
 
-  // Validation helpers
   const showError = (input, message) => {
     input.classList.add('error');
-    const errorEl = input.parentElement.querySelector('.form-error');
+    const group = input.closest('.form-group');
+    const errorEl = group ? group.querySelector('.form-error') : null;
     if (errorEl) {
       errorEl.textContent = message;
       errorEl.classList.add('visible');
@@ -31,98 +53,117 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const clearError = (input) => {
     input.classList.remove('error');
-    const errorEl = input.parentElement.querySelector('.form-error');
+    const group = input.closest('.form-group');
+    const errorEl = group ? group.querySelector('.form-error') : null;
     if (errorEl) {
+      errorEl.textContent = '';
       errorEl.classList.remove('visible');
     }
   };
 
   const validateField = (input) => {
-    const value = input.value.trim();
-    const type = input.type;
-    const name = input.name;
+    const value = input.type === 'checkbox' ? (input.checked ? input.value : '') : input.value.trim();
 
     if (input.required && !value) {
-      showError(input, 'This field is required.');
+      showError(input, input.type === 'checkbox' ? 'Please provide consent so we can respond.' : 'This field is required.');
       return false;
     }
 
-    if (type === 'email' && value) {
-      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailPattern.test(value)) {
-        showError(input, 'Please enter a valid email address.');
-        return false;
-      }
+    if (input.type === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      showError(input, 'Please enter a valid email address.');
+      return false;
     }
 
-    if (name === 'phone' && value) {
-      const phonePattern = /^[\d\s\-+()]{8,15}$/;
-      if (!phonePattern.test(value)) {
-        showError(input, 'Please enter a valid phone number.');
-        return false;
-      }
+    if (input.name === 'phone' && value && !/^[\d\s\-+()]{8,15}$/.test(value)) {
+      showError(input, 'Please enter a valid phone number.');
+      return false;
     }
 
     clearError(input);
     return true;
   };
 
-  // Real-time validation on blur
-  const inputs = form.querySelectorAll('input[required], select[required], textarea[required]');
-  inputs.forEach(input => {
+  const requiredInputs = form.querySelectorAll('input[required], select[required], textarea[required]');
+  requiredInputs.forEach((input) => {
     input.addEventListener('blur', () => validateField(input));
-    input.addEventListener('input', () => {
-      if (input.classList.contains('error')) {
-        validateField(input);
-      }
+    input.addEventListener(input.type === 'checkbox' ? 'change' : 'input', () => {
+      if (input.classList.contains('error')) validateField(input);
     });
   });
 
-  // Form submission
-  form.addEventListener('submit', (e) => {
-    let isValid = true;
+  if (backupBtn) {
+    backupBtn.addEventListener('click', () => {
+      backupBtn.disabled = true;
+      HTMLFormElement.prototype.submit.call(form);
+    });
+  }
 
-    inputs.forEach(input => {
-      if (!validateField(input)) {
-        isValid = false;
-      }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    let isValid = true;
+    requiredInputs.forEach((input) => {
+      if (!validateField(input)) isValid = false;
     });
 
+    const honeypot = document.getElementById('_gotcha');
+    if (honeypot && honeypot.value.trim()) return;
+
     if (!isValid) {
-      e.preventDefault();
       const firstError = form.querySelector('.error');
       if (firstError) firstError.focus();
       return;
     }
 
-    // If using Formspree AJAX submission
-    e.preventDefault();
-    const formData = new FormData(form);
-    const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = 'Sending...';
     submitBtn.disabled = true;
+    submitError?.classList.remove('visible');
+    backupBtn?.classList.remove('visible');
 
-    fetch(form.action, {
-      method: 'POST',
-      body: formData,
-      headers: { 'Accept': 'application/json' }
-    })
-    .then(response => {
-      if (response.ok) {
-        form.style.display = 'none';
-        const successMsg = document.querySelector('.form-success');
-        if (successMsg) successMsg.classList.add('visible');
+    const formData = new FormData(form);
+
+    try {
+      let response;
+      let result;
+
+      if (useAnchorForms) {
+        response = await fetch(`${anchorApiBase}/api/forms/${encodeURIComponent(anchorSiteId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(formData.entries()))
+        });
+        result = await response.json().catch(() => ({}));
+
+        if (!response.ok || result.accepted !== true || !result.submissionId) {
+          const error = new Error(result.error || result.errors?.join(' ') || 'The secure form service did not accept the enquiry.');
+          error.definitiveRejection = response.status >= 400 && response.status < 500;
+          throw error;
+        }
       } else {
-        submitBtn.textContent = originalText;
-        submitBtn.disabled = false;
-        alert('Something went wrong. Please try again or contact us directly.');
+        response = await fetch(form.action, {
+          method: 'POST',
+          body: formData,
+          headers: { 'Accept': 'application/json' }
+        });
+        result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
       }
-    })
-    .catch(() => {
+
+      form.style.display = 'none';
+      successMsg?.classList.add('visible');
+      form.reset();
+      resetSubmissionMetadata();
+      successMsg?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (error) {
+      console.error('Form submission error:', error);
+      submitError?.classList.add('visible');
+      if (useAnchorForms) backupBtn?.classList.add('visible');
+      if (error.definitiveRejection) resetSubmissionMetadata();
+      submitError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } finally {
       submitBtn.textContent = originalText;
       submitBtn.disabled = false;
-      alert('Something went wrong. Please try again or contact us directly.');
-    });
+    }
   });
 });

@@ -22,6 +22,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Prepare and verify deploy artifact
+        env:
+          ANCHOR_FORMS_API_BASE: ${{ vars.ANCHOR_FORMS_API_BASE }}
+        run: |
+          node scripts/prepare-deploy.mjs
+          node scripts/verify-deploy.mjs
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -84,7 +96,7 @@ jobs:
         env:
           S3_BUCKET: ${{ steps.infra.outputs.bucket }}
         run: |
-          aws s3 sync src/ "s3://$S3_BUCKET" \
+          aws s3 sync .deploy/ "s3://$S3_BUCKET" \
             --delete \
             --cache-control "max-age=31536000,public" \
             --exclude "*.html"
@@ -93,7 +105,7 @@ jobs:
         env:
           S3_BUCKET: ${{ steps.infra.outputs.bucket }}
         run: |
-          aws s3 sync src/ "s3://$S3_BUCKET" \
+          aws s3 sync .deploy/ "s3://$S3_BUCKET" \
             --delete \
             --cache-control "max-age=300,public" \
             --include "*.html"
